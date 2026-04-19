@@ -2,11 +2,10 @@ package postgres
 
 import "github.com/google/uuid"
 
-const pqErrCodeUniqueViolation = "23505"
-
-type Traveller struct {
-	ID        uuid.UUID `db:"id"`
-	FirstName string    `db:"first_name"`
-	LastName  string    `db:"last_name"`
-	Age       int       `db:"age"`
+type Product struct {
+	ID           uuid.UUID `db:"id"`
+	Name         string    `db:"name"`
+	CategoryName string    `db:"category_name"`
+	CategoryTax  float64   `db:"category_tax"`
+	Price        float64   `db:"price"`
 }

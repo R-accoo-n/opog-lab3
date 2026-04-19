@@ -1,9 +1,9 @@
-CREATE TABLE IF NOT EXISTS travellers (
-    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    first_name TEXT NOT NULL,
-    last_name  TEXT NOT NULL,
-    age        INT  NOT NULL
-);
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_travellers_name_age
-    ON travellers (first_name, last_name, age);
+CREATE TABLE IF NOT EXISTS products (
+                                        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    category_name TEXT NOT NULL,
+    category_tax DOUBLE PRECISION NOT NULL CHECK (category_tax >= 0),
+    price DOUBLE PRECISION NOT NULL CHECK (price >= 0)
+    );

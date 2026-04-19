@@ -7,53 +7,46 @@ import (
 	"github.com/google/uuid"
 )
 
-type Travellers struct {
-	travellerStorage TravellerStorage
+type Products struct {
+	productStorage ProductStorage
 }
 
-func NewTravellers(db TravellerStorage) Travellers {
-	return Travellers{travellerStorage: db}
+func NewProducts(db ProductStorage) Products {
+	return Products{productStorage: db}
 }
 
-func (t Travellers) GetTraveller(ctx context.Context, id uuid.UUID) (Traveller, error) {
+func (p Products) CreateProduct(ctx context.Context, params CreateProductPayload) (uuid.UUID, error) {
+	if params.Name == "" {
+		return uuid.Nil, fmt.Errorf("%w: name is required", ErrInvalidInput)
+	}
+	if params.Category.Name == "" {
+		return uuid.Nil, fmt.Errorf("%w: category name is required", ErrInvalidInput)
+	}
+	if params.Price < 0 {
+		return uuid.Nil, fmt.Errorf("%w: price cannot be negative", ErrInvalidInput)
+	}
+	if params.Category.Tax < 0 {
+		return uuid.Nil, fmt.Errorf("%w: tax cannot be negative", ErrInvalidInput)
+	}
+
+	id, err := p.productStorage.Create(ctx, params)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to create product: %w", err)
+	}
+
+	return id, nil
+}
+
+func (p Products) GetProduct(ctx context.Context, id uuid.UUID) (Product, float64, error) {
 	if id == uuid.Nil {
-		return Traveller{}, fmt.Errorf("id must be a valid uuid")
+		return Product{}, 0, fmt.Errorf("%w: invalid uuid", ErrInvalidInput)
 	}
 
-	res, err := t.travellerStorage.Get(ctx, id)
+	product, err := p.productStorage.Get(ctx, id)
 	if err != nil {
-		return Traveller{}, fmt.Errorf("%w: failed to get traveller from travellerStorage", err)
+		return Product{}, 0, fmt.Errorf("failed to get product: %w", err)
 	}
 
-	return res, nil
-}
-
-func (t Travellers) CreateTraveller(ctx context.Context, traveller CreateTravellerPayload) (uuid.UUID, error) {
-	if traveller.FirstName == "" || traveller.LastName == "" {
-		return uuid.Nil, fmt.Errorf("%w: first name and last name must be provided", ErrInvalidInput)
-	}
-
-	travellerID, err := t.travellerStorage.Create(ctx, traveller)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to create traveller in travellerStorage: %w", err)
-	}
-
-	return travellerID, nil
-}
-
-func (t Travellers) BulkCreateTravellers(ctx context.Context, travellers []CreateTravellerPayload) ([]uuid.UUID, error) {
-	if len(travellers) == 0 {
-		return nil, fmt.Errorf("%w: travellers list must not be empty", ErrInvalidInput)
-	}
-
-	travellerIDs, err := t.travellerStorage.BulkCreate(ctx, travellers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to bulk create travellers in travellerStorage: %w", err)
-	}
-
-	return travellerIDs, nil
-}
-
-func (t Travellers) DeleteTraveller() {
-
+	finalPrice := product.Price + product.Price*product.Category.Tax/100
+	return product, finalPrice, nil
 }
