@@ -1,0 +1,30 @@
+### GET request to example server
+GET http://localhost:8081/api/v1/travellers?id=9f47303a-2295-4528-a6e9-16eec3b86e56
+
+###
+
+### DELETE request to example server
+DELETE http://localhost:8081/api/v1/travellers
+
+###
+
+### POST request to example server
+POST http://localhost:8081/api/v1/travellers
+
+{
+"first_name": "John",
+"last_name": "Testman",
+"age": 20
+}
+
+###
+
+### PUT request to example server
+PUT http://localhost:8081/api/v1/travellers
+
+###
+
+### PUT request to example server
+GET http://localhost:8081/api/v1/not_valid
+
+###
