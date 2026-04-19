@@ -7,128 +7,91 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"golang.org/x/exp/slog"
 
-	"github.com/DenisGoldiner/webapp/internal"
+	"github.com/R-accoo-n/opog-lab3/internal"
 )
 
-type TravellerHandler struct {
-	service internal.Travellers
+type ProductHandler struct {
+	service internal.Products
 }
 
-func NewTravellerHandler(service internal.Travellers) TravellerHandler {
-	return TravellerHandler{
-		service: service,
-	}
+func NewProductHandler(service internal.Products) ProductHandler {
+	return ProductHandler{service: service}
 }
 
-func (h TravellerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h ProductHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		h.GetTraveller(w, r)
+		h.GetProduct(w, r)
 	case http.MethodPost:
-		h.CreateTraveller(w, r)
-	case http.MethodDelete:
-		h.DeleteTraveller(w, r)
+		h.CreateProduct(w, r)
 	default:
-		msg := fmt.Sprintf("method %s is not supported", r.Method)
-		slog.Info(msg)
-		http.Error(w, msg, http.StatusMethodNotAllowed)
+		http.Error(w, fmt.Sprintf("method %s is not supported", r.Method), http.StatusMethodNotAllowed)
 	}
 }
 
-func (h TravellerHandler) GetTraveller(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Get")
-
-	ctx := r.Context()
-
-	idParam := r.URL.Query().Get("id")
-	id, err := uuid.Parse(idParam)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("id must be a valid uuid"), http.StatusBadRequest)
+func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
+	var req CreateProductRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	res, err := h.service.GetTraveller(ctx, id)
-	if errors.Is(err, internal.ErrNoResource) {
-		slog.Warn("request failed", "error", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
+	id, err := h.service.CreateProduct(r.Context(), internal.CreateProductPayload{
+		Name: req.Name,
+		Category: internal.Category{
+			Name: req.Category.Name,
+			Tax:  req.Category.Tax,
+		},
+		Price: req.Price,
+	})
 	if err != nil {
-		slog.Error("request failed", "error", err)
+		if errors.Is(err, internal.ErrInvalidInput) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	respTraveller := Traveller{
-		ID:        res.ID,
-		FirstName: res.FirstName,
-		LastName:  res.LastName,
-		Age:       res.Age,
-	}
-
-	if err = json.NewEncoder(w).Encode(respTraveller); err != nil {
-		slog.Error("failed to encode response", "error", err)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]string{"id": id.String()})
 }
 
-func (h TravellerHandler) CreateTraveller(w http.ResponseWriter, r *http.Request) {
-	slog.Info("Create")
-
-	if r.Body == nil {
-		http.Error(w, "Body must not be nil", http.StatusBadRequest)
-		return
-	}
-
-	var payload CreateTravellerPayload
-
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		err = fmt.Errorf("failed to decode the body: %w", err)
-		slog.Error("Create request failed", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	slog.Info("CreateTravellerPayload", "payload", payload)
-
-	travellerID, err := h.service.CreateTraveller(r.Context(), payload.toServiceParams())
-	if errors.Is(err, internal.ErrAlreadyExists) {
-		slog.Error("Create request failed", "error", err)
-		http.Error(w, "The traveller already exists", http.StatusConflict)
-		return
-	}
-	if errors.Is(err, internal.ErrInvalidInput) {
-		slog.Error("Create request failed", "error", err)
-		http.Error(w, "The traveller data is not valid", http.StatusBadRequest)
-		return
-	}
-
+func (h ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
+	rawID := r.URL.Query().Get("id")
+	id, err := uuid.Parse(rawID)
 	if err != nil {
-		slog.Error("Create request failed", "error", err)
+		http.Error(w, "invalid uuid", http.StatusBadRequest)
+		return
+	}
+
+	product, finalPrice, err := h.service.GetProduct(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, internal.ErrNoResource) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, internal.ErrInvalidInput) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	respTraveller := CreateTravellerResponse{
-		ID: travellerID,
+	resp := ProductResponse{
+		ID:   product.ID.String(),
+		Name: product.Name,
+		Category: CategoryPayload{
+			Name: product.Category.Name,
+			Tax:  product.Category.Tax,
+		},
+		Price:      product.Price,
+		FinalPrice: finalPrice,
 	}
 
-	if err = json.NewEncoder(w).Encode(respTraveller); err != nil {
-		slog.Error("failed to encode response", "error", err)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-func (h TravellerHandler) DeleteTraveller(w http.ResponseWriter, r *http.Request) {
-	slog.Info("DeleteTraveller")
-
-	h.service.DeleteTraveller()
-
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
 }

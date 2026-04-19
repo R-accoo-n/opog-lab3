@@ -1,0 +1,15 @@
+POST http://localhost:8081/api/v1/products
+Content-Type: application/json
+
+{
+  "name": "MacBook Air M3",
+  "category": {
+    "name": "Laptops",
+    "tax": 20
+  },
+  "price": 5200
+}
+
+###
+
+GET http://localhost:8081/api/v1/products?id=67daba6f-e7e8-48e3-a80a-54acb7bfc4fd
